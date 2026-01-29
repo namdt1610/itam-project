@@ -1,0 +1,7 @@
+{
+  "server_url": "http://localhost:8080/api/report",
+  "auth_token": "8ac32ce17f8f6ffb8714b6916ed1a6bb5afc531d70c5b3ab7f6a7e5341ffb606",
+  "top_process_limit": 5,
+  "jitter_seconds": 30,
+  "log_level": "error"
+}

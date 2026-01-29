@@ -1,0 +1,162 @@
+/* ITAM Dashboard - Custom Styles */
+
+:root {
+  --tblr-primary: #206bc4;
+  --tblr-bg-surface: #1a1d21;
+  --tblr-body-bg: #151619;
+}
+
+/* Dark theme enhancements */
+[data-bs-theme="dark"] {
+  --tblr-body-bg: #0d1117;
+  --tblr-bg-surface: #161b22;
+  --tblr-border-color: #30363d;
+}
+
+/* Card hover effects */
+.card {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  border: 1px solid var(--tblr-border-color);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Stats cards gradient backgrounds */
+.avatar.bg-primary {
+  background: linear-gradient(135deg, #206bc4 0%, #4dabf7 100%) !important;
+}
+
+.avatar.bg-success {
+  background: linear-gradient(135deg, #2fb344 0%, #51cf66 100%) !important;
+}
+
+.avatar.bg-azure {
+  background: linear-gradient(135deg, #4299e1 0%, #63b3ed 100%) !important;
+}
+
+.avatar.bg-purple {
+  background: linear-gradient(135deg, #ae3ec9 0%, #cc5de8 100%) !important;
+}
+
+/* Table styling */
+.table-responsive {
+  border-radius: 0 0 4px 4px;
+}
+
+.table > :not(caption) > * > * {
+  border-bottom-color: var(--tblr-border-color);
+}
+
+/* Status indicators */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.status-online {
+  background-color: #2fb344;
+  box-shadow: 0 0 8px rgba(47, 179, 68, 0.5);
+  animation: pulse 2s infinite;
+}
+
+.status-offline {
+  background-color: #d63939;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Progress bars in table */
+.progress-thin {
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* Chart containers */
+.chart-container {
+  position: relative;
+  height: 200px;
+}
+
+/* Navbar brand styling */
+.navbar-brand span {
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #4dabf7 0%, #206bc4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--tblr-body-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--tblr-border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a5568;
+}
+
+/* Badge pulse animation for live updates */
+.badge.bg-blue-lt {
+  animation: badgePulse 3s infinite;
+}
+
+@keyframes badgePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* HTMX loading indicator */
+.htmx-request .htmx-indicator {
+  display: inline-block;
+}
+
+.htmx-indicator {
+  display: none;
+}
+
+/* Row highlighting on hover */
+.table tbody tr:hover {
+  background-color: rgba(32, 107, 196, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+}
