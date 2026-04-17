@@ -187,3 +187,7 @@
 2026/01/28 15:07:28 [SUMMARY] Received 500 reports in last minute
 2026/01/28 15:13:28 [SUMMARY] Received 500 reports in last minute
 2026/01/28 15:51:00 [SUMMARY] Received 500 reports in last minute
+2026/04/18 00:02:14 Pruned 3438 old history records (> 30 days)
+2026/04/18 00:02:51 [INFO] LogSummary shutting down
+2026/04/18 00:17:58 [SUMMARY] Received 500 reports in last minute
+2026/04/18 00:21:19 [INFO] LogSummary shutting down

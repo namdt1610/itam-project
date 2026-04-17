@@ -6,6 +6,10 @@
   --tblr-body-bg: #151619;
 }
 
+html {
+  font-size: 18px !important;
+}
+
 /* Dark theme enhancements */
 [data-bs-theme="dark"] {
   --tblr-body-bg: #0d1117;

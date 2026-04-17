@@ -112,6 +112,12 @@ func renderAssetsTableWithPagination(w http.ResponseWriter, query string, page, 
 		ramColor := getProgressColor(asset.Report.RAMPercent)
 		diskColor := getProgressColor(asset.Report.DiskPercent)
 
+		// Escape user-controlled strings to prevent XSS
+		hostname := escapeHTML(asset.Report.Hostname)
+		osName := escapeHTML(asset.Report.OS)
+		ipLAN := escapeHTML(asset.Report.IPLAN)
+		macAddr := escapeHTML(asset.Report.MACAddress)
+
 		fmt.Fprintf(w, `
 		<tr style="cursor: pointer;" hx-get="/api/assets/detail?mac=%s" hx-target="#modal-content" hx-trigger="click" data-bs-toggle="modal" data-bs-target="#assetModal">
 			<td>
@@ -148,11 +154,11 @@ func renderAssetsTableWithPagination(w http.ResponseWriter, query string, page, 
 			<td class="text-nowrap"><span class="badge bg-blue-lt">%s</span></td>
 			<td class="text-secondary text-truncate" style="max-width: 120px;">%s</td>
 		</tr>`,
-			asset.Report.MACAddress,
+			macAddr,
 			statusClass, statusText, statusText,
-			asset.Report.Hostname,
-			asset.Report.OS,
-			asset.Report.IPLAN,
+			hostname,
+			osName,
+			ipLAN,
 			asset.Report.CPUUsage, cpuColor, asset.Report.CPUUsage,
 			asset.Report.RAMPercent, ramColor, asset.Report.RAMPercent,
 			asset.Report.DiskPercent, diskColor, asset.Report.DiskPercent,
@@ -472,16 +478,16 @@ func renderAssetDetail(w http.ResponseWriter, asset *Asset) {
 	<div class="modal-footer">
 		<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
 	</div>`,
-		asset.Report.Hostname, statusBadge,
-		asset.Report.Hostname,
-		asset.Report.OS,
-		asset.Report.IPLAN,
-		asset.Report.MACAddress,
-		asset.Report.SerialNumber,
-		asset.Report.BiosVersion,
+		escapeHTML(asset.Report.Hostname), statusBadge,
+		escapeHTML(asset.Report.Hostname),
+		escapeHTML(asset.Report.OS),
+		escapeHTML(asset.Report.IPLAN),
+		escapeHTML(asset.Report.MACAddress),
+		escapeHTML(asset.Report.SerialNumber),
+		escapeHTML(asset.Report.BiosVersion),
 		uptime,
 		lastSeen,
-		asset.Report.CPU, asset.Report.Cores,
+		escapeHTML(asset.Report.CPU), asset.Report.Cores,
 		getProgressColor(asset.Report.CPUUsage), asset.Report.CPUUsage, asset.Report.CPUUsage,
 		ramUsed, ramTotal,
 		getProgressColor(asset.Report.RAMPercent), asset.Report.RAMPercent, asset.Report.RAMPercent,
@@ -551,7 +557,7 @@ func renderProcessesTable(w http.ResponseWriter) {
 			<td class="text-secondary">%d</td>
 			<td>%.1f%%</td>
 			<td>%s</td>
-		</tr>`, p.Hostname, p.Process.Name, p.Process.PID, p.Process.CPU, memStr)
+		</tr>`, escapeHTML(p.Hostname), escapeHTML(p.Process.Name), p.Process.PID, p.Process.CPU, memStr)
 	}
 
 	fmt.Fprint(w, `
@@ -620,7 +626,7 @@ func renderAlertsTable(w http.ResponseWriter) {
 		fmt.Fprintf(w, `
 		<tr>
 			<td>
-				<span class="badge %s">
+				<span class="badge %s text-white">
 					<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-%s" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
 						<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
 						<path d="M12 9v2m0 4v.01"/>

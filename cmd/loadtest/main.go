@@ -12,7 +12,7 @@ import (
 
 const (
 	ServerURL  = "http://localhost:8080/api/report"
-	AuthToken  = "8ac32ce17f8f6ffb8714b6916ed1a6bb5afc531d70c5b3ab7f6a7e5341ffb606"
+	AuthToken  = "itam-secret-token-default"
 	AgentCount = 500
 )
 
@@ -21,16 +21,16 @@ type AgentReport struct {
 	Hostname     string       `json:"hostname"`
 	Uptime       uint64       `json:"uptime"`
 	CPU          string       `json:"cpu_model"`
-	CPU_Usage    float64      `json:"cpu_usage"`
+	CPUUsage     float64      `json:"cpu_usage"`
 	Cores        int          `json:"cores"`
 	RAM          uint64       `json:"ram_bytes"`
-	RAM_Usage    uint64       `json:"ram_usage_bytes"`
-	RAM_Percent  float64      `json:"ram_percent"`
+	RAMUsage     uint64       `json:"ram_usage_bytes"`
+	RAMPercent   float64      `json:"ram_percent"`
 	Disk         uint64       `json:"disk_bytes"`
 	DiskUsage    uint64       `json:"disk_usage_bytes"`
 	DiskPercent  float64      `json:"disk_percent"`
-	IP_LAN       string       `json:"ip_lan"`
-	MAC_Address  string       `json:"mac_address"`
+	IPLAN        string       `json:"ip_lan"`
+	MACAddress   string       `json:"mac_address"`
 	TopProcesses []TopProcess `json:"top_processes"`
 	SerialNumber string       `json:"serial_number"`
 }
@@ -46,30 +46,49 @@ type TopProcess struct {
 func main() {
 	var wg sync.WaitGroup
 	fmt.Printf("Starting load test with %d simulated agents...\n", AgentCount)
+	fmt.Printf("Target: %s\n", ServerURL)
 
-	// Semaphore to limit concurrency (mimic real world spread, or just don't kill CLI)
-	// Sending too fast might trigger server rate limits (429), which is expected
+	// Semaphore to limit concurrency
 	concurrency := 50
 	sem := make(chan struct{}, concurrency)
+
+	start := time.Now()
+	successCount := 0
+	failCount := 0
+	var mu sync.Mutex
 
 	for i := 0; i < AgentCount; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			sem <- struct{}{}        // Acquire
-			defer func() { <-sem }() // Release
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-			sendReport(id)
+			if sendReport(id) {
+				mu.Lock()
+				successCount++
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				failCount++
+				mu.Unlock()
+			}
 		}(i)
-		// Throttle: 500 requests / 10ms = 5s to finish, well under 100/s limit
 		time.Sleep(15 * time.Millisecond)
 	}
 
 	wg.Wait()
-	fmt.Println("Load test completed.")
+	elapsed := time.Since(start)
+
+	fmt.Println("\n=== Load Test Results ===")
+	fmt.Printf("Total: %d requests\n", AgentCount)
+	fmt.Printf("Success: %d\n", successCount)
+	fmt.Printf("Failed: %d\n", failCount)
+	fmt.Printf("Duration: %s\n", elapsed)
+	fmt.Printf("Rate: %.1f req/s\n", float64(AgentCount)/elapsed.Seconds())
 }
 
-func sendReport(id int) {
+func sendReport(id int) bool {
 	mac := fmt.Sprintf("00:11:22:33:%02x:%02x", id/256, id%256)
 	ip := fmt.Sprintf("192.168.%d.%d", id/256, id%256)
 
@@ -78,16 +97,16 @@ func sendReport(id int) {
 		Hostname:     fmt.Sprintf("PC-Node-%03d", id),
 		Uptime:       uint64(rand.Intn(100000)),
 		CPU:          "Intel Core i5-10400 @ 2.90GHz",
-		CPU_Usage:    rand.Float64() * 100,
+		CPUUsage:     rand.Float64() * 100,
 		Cores:        6,
 		RAM:          16 * 1024 * 1024 * 1024,
-		RAM_Usage:    uint64(rand.Int63n(16 * 1024 * 1024 * 1024)),
-		RAM_Percent:  rand.Float64() * 100,
+		RAMUsage:     uint64(rand.Int63n(16 * 1024 * 1024 * 1024)),
+		RAMPercent:   rand.Float64() * 100,
 		Disk:         512 * 1024 * 1024 * 1024,
 		DiskUsage:    uint64(rand.Int63n(512 * 1024 * 1024 * 1024)),
 		DiskPercent:  rand.Float64() * 100,
-		IP_LAN:       ip,
-		MAC_Address:  mac,
+		IPLAN:        ip,
+		MACAddress:   mac,
 		SerialNumber: fmt.Sprintf("SN-%06d", id),
 		TopProcesses: []TopProcess{
 			{PID: 1234, Name: "chrome.exe", CPU: 15.5, Memory: 500 * 1024 * 1024},
@@ -105,16 +124,19 @@ func sendReport(id int) {
 
 	if err != nil {
 		fmt.Printf("[Fail] Node %d: %v\n", id, err)
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Printf("[Fail] Node %d: Status %d\n", id, resp.StatusCode)
-	} else {
-		// Only print every 50th success to avoid spamming console
 		if id%50 == 0 {
-			fmt.Printf("[OK] Node %d reports sent.\n", id)
+			fmt.Printf("[Fail] Node %d: Status %d\n", id, resp.StatusCode)
 		}
+		return false
 	}
+
+	if id%100 == 0 {
+		fmt.Printf("[OK] Node %d sent\n", id)
+	}
+	return true
 }

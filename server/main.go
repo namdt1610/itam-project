@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -40,8 +43,12 @@ func main() {
 		defer appLogger.Close()
 	}
 
-	// Start log summary goroutine
-	go LogSummary()
+	// Context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start log summary goroutine with context
+	go LogSummary(ctx)
 
 	// Prune old data on startup (keep 30 days of history)
 	store.PruneOldData(30)
@@ -70,9 +77,26 @@ func main() {
 	// Dashboard
 	http.HandleFunc("/", handleDashboard)
 
+	// Create server with config port
+	addr := fmt.Sprintf(":%d", config.Port)
+	server := &http.Server{Addr: addr}
+
+	// Graceful shutdown on SIGINT/SIGTERM
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
+		fmt.Println("\nShutting down gracefully...")
+		cancel() // Stop LogSummary goroutine
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		server.Shutdown(shutdownCtx)
+	}()
+
 	printBanner()
 
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := server.ListenAndServe(); err != http.ErrServerClosed {
 		fmt.Printf("Server failed to start: %v\n", err)
 	}
 }

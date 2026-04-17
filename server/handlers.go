@@ -4,13 +4,13 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -55,15 +55,15 @@ func checkRateLimit() bool {
 
 	now := time.Now()
 	if now.Sub(lastReset) > rateLimitWindow {
-		atomic.StoreInt64(&rateLimitCount, 0)
+		rateLimitCount = 0
 		lastReset = now
 	}
 
-	if atomic.LoadInt64(&rateLimitCount) >= maxRequestsPerSec {
+	if rateLimitCount >= maxRequestsPerSec {
 		return false // Rate limited
 	}
 
-	atomic.AddInt64(&rateLimitCount, 1)
+	rateLimitCount++
 	return true
 }
 
@@ -99,6 +99,26 @@ func handleStatic(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
+// checkAuthToken validates the bearer token from the request.
+// Returns true if authorized, false if rejected (and writes HTTP error).
+func checkAuthToken(w http.ResponseWriter, r *http.Request) bool {
+	if config.AuthToken == "" {
+		return true // No token configured, allow all
+	}
+	authHeader := r.Header.Get("Authorization")
+	expectedToken := "Bearer " + config.AuthToken
+	if authHeader != expectedToken {
+		masked := "empty"
+		if len(authHeader) > 10 {
+			masked = authHeader[:10] + "..."
+		}
+		fmt.Printf("[AUTH FAIL] Received: '%s', Expected: '%s...'\n", masked, expectedToken[:10])
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return false
+	}
+	return true
+}
+
 // handleReport receives agent reports
 func handleReport(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -114,23 +134,15 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auth token validation
-	authHeader := r.Header.Get("Authorization")
-	expectedToken := "Bearer " + config.AuthToken
-	if config.AuthToken != "" && authHeader != expectedToken {
-		// DEBUG: Print what we received (masked)
-		masked := "empty"
-		if len(authHeader) > 10 {
-			masked = authHeader[:10] + "..."
-		}
-		fmt.Printf("[AUTH FAIL] Received: '%s', Expected: '%s...'\n", masked, expectedToken[:10])
-
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	if !checkAuthToken(w, r) {
 		return
 	}
 
+	// Limit request body to 1MB to prevent OOM
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading body", http.StatusInternalServerError)
+		http.Error(w, "Request body too large or read error", http.StatusRequestEntityTooLarge)
 		return
 	}
 	defer r.Body.Close()
@@ -142,15 +154,16 @@ func handleReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store the asset
+	// Hardware change detection and performance threshold alerts are handled inside Save() now,
+	// so we don't need to call CheckAndCreateAlerts here.
 	if err := store.Save(report); err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		LogError("Database save failed: %v", err)
 		return
 	}
 
-	// Save to history and check for alerts
+	// We do save history though.
 	store.SaveHistory(report.MACAddress, report.CPUUsage, report.RAMPercent)
-	store.CheckAndCreateAlerts(report)
 
 	// Increment request counter (summary logged every minute)
 	LogRequest()
@@ -367,6 +380,11 @@ func handleAdminCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Admin endpoints require auth token
+	if !checkAuthToken(w, r) {
+		return
+	}
+
 	mac := r.URL.Query().Get("mac")
 	command := r.URL.Query().Get("cmd")
 
@@ -382,6 +400,11 @@ func handleAdminCommand(w http.ResponseWriter, r *http.Request) {
 		"status":  "ok",
 		"message": fmt.Sprintf("Command '%s' queued for agent %s", command, mac),
 	})
+}
+
+// escapeHTML escapes a string for safe HTML rendering (XSS prevention)
+func escapeHTML(s string) string {
+	return html.EscapeString(s)
 }
 
 var serverStart = time.Now()

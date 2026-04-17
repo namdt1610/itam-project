@@ -2,3 +2,5 @@
 # Database
 itam.db
 *.db
+server/config.json
+agent/config.json

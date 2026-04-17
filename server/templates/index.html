@@ -9,24 +9,19 @@
       content="Real-time IT Asset Management Dashboard"
     />
 
-    <!-- Tabler.io CSS -->
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/css/tabler.min.css"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/css/tabler-vendors.min.css"
-    />
+    <!-- Tabler.io CSS (self-hosted) -->
+    <link rel="stylesheet" href="/static/vendor/css/tabler.min.css" />
+    <link rel="stylesheet" href="/static/vendor/css/tabler-vendors.min.css" />
 
     <!-- Custom Styles -->
     <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/css/toast.css" />
 
-    <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@2.0.0"></script>
+    <!-- HTMX (self-hosted) -->
+    <script src="/static/vendor/js/htmx.min.js"></script>
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Chart.js (self-hosted) -->
+    <script src="/static/vendor/js/chart.umd.min.js"></script>
   </head>
   <body class="theme-dark">
     <div class="page">
@@ -336,13 +331,14 @@
             <div class="row row-deck row-cards mt-3">
               <div class="col-12">
                 <div class="card">
-                  <div class="card-header">
-                    <h3 class="card-title">Asset Inventory</h3>
-                    <div class="card-actions">
-                      <div
-                        class="input-group input-group-sm me-3"
-                        style="width: 250px"
-                      >
+                  <div
+                    class="card-header d-flex flex-wrap flex-md-nowrap align-items-center"
+                  >
+                    <h3 class="card-title mb-0 me-auto">Asset Inventory</h3>
+                    <div
+                      class="card-actions d-flex flex-nowrap align-items-center mt-2 mt-md-0"
+                    >
+                      <div class="input-group me-2" style="min-width: 200px">
                         <span class="input-group-text">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -371,7 +367,7 @@
                       </div>
                       <a
                         href="/api/export/csv"
-                        class="btn btn-outline-success btn-sm me-2"
+                        class="btn btn-outline-success me-2"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -480,7 +476,9 @@
             <div class="row text-center align-items-center flex-row-reverse">
               <div class="col-12 col-lg-auto mt-3 mt-lg-0">
                 <ul class="list-inline list-inline-dots mb-0">
-                  <li class="list-inline-item">ITAM System &copy; 2026</li>
+                  <li class="list-inline-item">
+                    ITAM System By Nam Dang &copy; 2026
+                  </li>
                   <li class="list-inline-item">
                     <span class="badge bg-green-lt">Server Online</span>
                   </li>
@@ -510,8 +508,11 @@
       </div>
     </div>
 
-    <!-- Tabler.io JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/js/tabler.min.js"></script>
+    <!-- Tabler.io JS (self-hosted) -->
+    <script src="/static/vendor/js/tabler.min.js"></script>
+
+    <!-- Toast Notifications -->
+    <script src="/static/js/toast.js"></script>
 
     <!-- Dashboard Scripts -->
     <script src="/static/js/dashboard.js"></script>

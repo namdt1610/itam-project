@@ -20,7 +20,7 @@ func LoadServerConfig() error {
 	config = ServerConfig{
 		AuthToken: "itam-secret-token-default", // Fallback only
 		Port:      8080,
-		DBPath:    "itam.db",
+		DBPath:    "data/itam.db",
 	}
 
 	file, err := os.ReadFile("config.json")

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"time"
@@ -55,29 +56,61 @@ type AgentReport struct {
 	BiosVersion  string       `json:"bios_version"`
 }
 
+// Build-time variables - override with: go build -ldflags "-X main.BuildServerURL=... -X main.BuildAuthToken=..."
+var (
+	BuildServerURL = ""  // Injected at build time
+	BuildAuthToken = ""  // Injected at build time
+)
+
 var config Config
 
 func loadConfig() {
-	// Default configuration (Embedded)
-	// This allows the agent to run as a single exe without config.json
+	// Default configuration
 	config = Config{
-		ServerURL:       "http://172.16.204.143:8080/api/report",
-		AuthToken:       "8ac32ce17f8f6ffb8714b6916ed1a6bb5afc531d70c5b3ab7f6a7e5341ffb606",
+		ServerURL:       "http://localhost:8080/api/report",
+		AuthToken:       "",
 		TopProcessLimit: 5,
 		JitterSeconds:   30,
 		LogLevel:        "info",
 	}
 
-	// Override with file if exists
-	file, err := os.ReadFile("config.json")
+	// Priority 1: Build-time values (highest priority for single-exe deployment)
+	if BuildServerURL != "" {
+		config.ServerURL = BuildServerURL
+	}
+	if BuildAuthToken != "" {
+		config.AuthToken = BuildAuthToken
+	}
+
+	// Priority 2: Environment variable for auth token
+	if envToken := os.Getenv("ITAM_AUTH_TOKEN"); envToken != "" {
+		config.AuthToken = envToken
+	}
+
+	// Priority 3: Config file next to executable (can override build-time values)
+	exePath, err := os.Executable()
 	if err == nil {
+		configPath := filepath.Join(filepath.Dir(exePath), "config.json")
+		if file, err := os.ReadFile(configPath); err == nil {
+			if err := json.Unmarshal(file, &config); err == nil {
+				fmt.Printf("Config overridden from: %s\n", configPath)
+				return
+			}
+		}
+	}
+
+	// Priority 4: Config file in current directory
+	if file, err := os.ReadFile("config.json"); err == nil {
 		if err := json.Unmarshal(file, &config); err == nil {
-			fmt.Printf("Loaded config from file: Server=%s\n", config.ServerURL)
+			fmt.Println("Config overridden from ./config.json")
 			return
 		}
 	}
 
-	fmt.Printf("Using embedded config: Server=%s\n", config.ServerURL)
+	if config.AuthToken == "" {
+		fmt.Println("WARNING: No auth token configured!")
+	}
+	fmt.Printf("Using config: Server=%s\n", config.ServerURL)
 }
 
 func main() {

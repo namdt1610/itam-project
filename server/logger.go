@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -111,12 +112,21 @@ func LogRequest() {
 }
 
 // LogSummary logs summary periodically (call from goroutine)
-func LogSummary() {
+// Pass a context to enable graceful shutdown
+func LogSummary(ctx context.Context) {
+	ticker := time.NewTicker(logInterval)
+	defer ticker.Stop()
+
 	for {
-		time.Sleep(logInterval)
-		count := atomic.SwapInt64(&requestCount, 0)
-		if count > 0 {
-			log.Printf("[SUMMARY] Received %d reports in last minute", count)
+		select {
+		case <-ticker.C:
+			count := atomic.SwapInt64(&requestCount, 0)
+			if count > 0 {
+				log.Printf("[SUMMARY] Received %d reports in last minute", count)
+			}
+		case <-ctx.Done():
+			log.Println("[INFO] LogSummary shutting down")
+			return
 		}
 	}
 }

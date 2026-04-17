@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -202,6 +204,9 @@ func (s *AssetStore) PruneOldData(days int) (int64, error) {
 
 // Save stores an asset by MAC address (upsert)
 func (s *AssetStore) Save(report AgentReport) error {
+	// 1. Fetch old asset to check for hardware changes
+	oldAsset, _ := s.GetByMAC(report.MACAddress)
+
 	processesJSON, _ := json.Marshal(report.TopProcesses)
 
 	_, err := s.db.Exec(`
@@ -234,6 +239,12 @@ func (s *AssetStore) Save(report AgentReport) error {
 		report.RAM, report.RAMUsage, report.RAMPercent, report.Disk, report.DiskUsage, report.DiskPercent, report.Uptime,
 		report.SerialNumber, report.BiosVersion, string(processesJSON), time.Now(),
 	)
+	
+	if err == nil {
+		// 2. Check for alerts (thresholds and hardware changes)
+		s.CheckAndCreateAlerts(oldAsset, report)
+	}
+
 	return err
 }
 
@@ -466,7 +477,33 @@ func (s *AssetStore) GetHistory(macAddress string) ([]HistoryPoint, error) {
 }
 
 // CheckAndCreateAlerts checks thresholds and creates alerts
-func (s *AssetStore) CheckAndCreateAlerts(report AgentReport) {
+func (s *AssetStore) CheckAndCreateAlerts(oldAsset *Asset, report AgentReport) {
+	// Hardware Change Detection
+	if oldAsset != nil {
+		// Detect RAM Downgrade (e.g. 16GB -> 8GB)
+		// Usually memory varies a tiny bit in reporting, but drops > 1GB mean parts missing
+		if oldAsset.Report.RAM > report.RAM && (oldAsset.Report.RAM-report.RAM) > 1024*1024*1024 {
+			msg := fmt.Sprintf("Hardware Alert: RAM dropped from %.1fGB to %.1fGB!", 
+				float64(oldAsset.Report.RAM)/1024/1024/1024, 
+				float64(report.RAM)/1024/1024/1024)
+			s.createAlert(report.MACAddress, report.Hostname, "HARDWARE_CHANGED", msg, "critical")
+		}
+
+		// Detect Disk Downgrade (e.g swap large drive for small drive)
+		if oldAsset.Report.Disk > report.Disk && (oldAsset.Report.Disk-report.Disk) > 10*1024*1024*1024 {
+			msg := fmt.Sprintf("Hardware Alert: Disk dropped from %.1fGB to %.1fGB!", 
+				float64(oldAsset.Report.Disk)/1024/1024/1024, 
+				float64(report.Disk)/1024/1024/1024)
+			s.createAlert(report.MACAddress, report.Hostname, "HARDWARE_CHANGED", msg, "critical")
+		}
+
+		// Detect CPU Swap
+		if oldAsset.Report.CPU != report.CPU && oldAsset.Report.CPU != "" {
+			msg := fmt.Sprintf("Hardware Alert: CPU changed from '%s' to '%s'!", oldAsset.Report.CPU, report.CPU)
+			s.createAlert(report.MACAddress, report.Hostname, "HARDWARE_CHANGED", msg, "critical")
+		}
+	}
+
 	// High CPU alert (>90%)
 	if report.CPUUsage > 90 {
 		s.createAlert(report.MACAddress, report.Hostname, "HIGH_CPU",
@@ -556,30 +593,45 @@ func (s *AssetStore) GetUnresolvedAlertCount() int {
 	return count
 }
 
-// ExportAssetsCSV returns all assets as CSV string
+// ExportAssetsCSV returns all assets as properly escaped CSV string
 func (s *AssetStore) ExportAssetsCSV() (string, error) {
 	assets, err := s.GetAll()
 	if err != nil {
 		return "", err
 	}
 
-	csv := "MAC Address,Hostname,OS,IP Address,CPU Model,CPU Usage %,RAM Total GB,RAM Usage %,Disk GB,Serial Number,Last Seen\n"
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+
+	// Write header
+	writer.Write([]string{
+		"MAC Address", "Hostname", "OS", "IP Address", "CPU Model",
+		"CPU Usage %", "RAM Total GB", "RAM Usage %", "Disk GB", "Serial Number", "Last Seen",
+	})
+
+	// Write data rows
 	for _, a := range assets {
-		csv += fmt.Sprintf("%s,%s,%s,%s,%s,%.1f,%.2f,%.1f,%.2f,%s,%s\n",
+		writer.Write([]string{
 			a.Report.MACAddress,
 			a.Report.Hostname,
 			a.Report.OS,
 			a.Report.IPLAN,
 			a.Report.CPU,
-			a.Report.CPUUsage,
-			float64(a.Report.RAM)/1024/1024/1024,
-			a.Report.RAMPercent,
-			float64(a.Report.Disk)/1024/1024/1024,
+			fmt.Sprintf("%.1f", a.Report.CPUUsage),
+			fmt.Sprintf("%.2f", float64(a.Report.RAM)/1024/1024/1024),
+			fmt.Sprintf("%.1f", a.Report.RAMPercent),
+			fmt.Sprintf("%.2f", float64(a.Report.Disk)/1024/1024/1024),
 			a.Report.SerialNumber,
 			a.LastSeen.Format("2006-01-02 15:04:05"),
-		)
+		})
 	}
-	return csv, nil
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
 
 // CleanOldHistory removes history older than 7 days
