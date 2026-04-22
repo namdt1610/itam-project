@@ -14,8 +14,11 @@ import (
 	"time"
 )
 
-//go:embed templates/*
+//go:embed templates
 var templatesFS embed.FS
+
+//go:embed web
+var staticFS embed.FS
 
 // Rate limiter for /api/report endpoint
 var (
@@ -85,18 +88,28 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, nil)
 }
 
-// handleStatic serves static files (CSS, JS)
+// handleStatic serves static files (CSS, JS) from embedded FS
 func handleStatic(w http.ResponseWriter, r *http.Request) {
-	path := "web/static" + r.URL.Path[7:] // Remove "/static" prefix
+	// The path in staticFS starts with "web/static/"
+	// URL path is "/static/..."
+	path := "web" + r.URL.Path
+
+	file, err := staticFS.ReadFile(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 
 	// Set correct MIME types
 	if strings.HasSuffix(path, ".js") {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	} else if strings.HasSuffix(path, ".css") {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	} else if strings.HasSuffix(path, ".svg") {
+		w.Header().Set("Content-Type", "image/svg+xml")
 	}
 
-	http.ServeFile(w, r, path)
+	w.Write(file)
 }
 
 // checkAuthToken validates the bearer token from the request.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type ServerConfig struct {
@@ -23,16 +24,27 @@ func LoadServerConfig() error {
 		DBPath:    "data/itam.db",
 	}
 
-	file, err := os.ReadFile("config.json")
+	// Look for config.json in the same directory as the executable
+	exePath, _ := os.Executable()
+	exeDir := filepath.Dir(exePath)
+	configPath := filepath.Join(exeDir, "config.json")
+
+	file, err := os.ReadFile(configPath)
 	if err != nil {
-		fmt.Println("Config file not found, using defaults")
-		return nil // Not an error to run with defaults, but warning printed
+		// Fallback to current working directory if not found next to exe
+		file, err = os.ReadFile("config.json")
+		if err != nil {
+			absPath, _ := filepath.Abs("config.json")
+			fmt.Printf("Config file NOT found next to exe or at: %s\nUsing default settings...\n", absPath)
+			return nil
+		}
+		configPath, _ = filepath.Abs("config.json")
 	}
 
 	if err := json.Unmarshal(file, &config); err != nil {
 		return fmt.Errorf("invalid config json: %w", err)
 	}
 
-	fmt.Printf("Loaded server config from config.json (Port: %d)\n", config.Port)
+	fmt.Printf("Successfully loaded config from: %s\n", configPath)
 	return nil
 }

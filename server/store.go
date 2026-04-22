@@ -25,6 +25,12 @@ var store *AssetStore
 
 // InitStore initializes the SQLite database
 func InitStore(dbPath string) error {
+	// Create directory if it doesn't exist
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return fmt.Errorf("failed to create database directory: %w", err)
+	}
+
 	// WAL mode + Long busy timeout + Transaction locking
 	dsn := dbPath + "?_journal_mode=WAL&_busy_timeout=10000&_txlock=immediate"
 	db, err := sql.Open("sqlite", dsn)
