@@ -28,6 +28,9 @@ build-server:
 	@mkdir -p data
 	go build -ldflags "-s -w" -o ./build/server_bin ./server
 
+build-windows-server:
+	GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o server.exe ./server
+
 # ===== RUN COMMANDS =====
 
 # Run server for development

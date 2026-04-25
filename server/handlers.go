@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -305,20 +306,25 @@ func handleAlertsTable(w http.ResponseWriter, r *http.Request) {
 
 // handleResolveAlert marks an alert as resolved
 func handleResolveAlert(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	// Support both JSON and Form values
+	var id int
+	idStr := r.FormValue("id")
+	if idStr != "" {
+		id, _ = strconv.Atoi(idStr)
+	} else {
+		var req struct {
+			ID int `json:"id"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		id = req.ID
+	}
+
+	if id == 0 {
+		http.Error(w, "ID is required", http.StatusBadRequest)
 		return
 	}
 
-	var req struct {
-		ID int `json:"id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	if err := store.ResolveAlert(req.ID); err != nil {
+	if err := store.ResolveAlert(id); err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}

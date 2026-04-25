@@ -34,6 +34,9 @@ function initCharts() {
     const chartConfig = {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+            duration: 0 // Disable animation to prevent "flying" points
+        },
         interaction: {
             mode: 'index',
             intersect: false,
@@ -80,10 +83,10 @@ function initCharts() {
         },
         elements: {
             line: {
-                tension: 0.4
+                tension: 0 // Straight lines for better stability
             },
             point: {
-                radius: 0,
+                radius: 3, // Show points for clarity
                 hoverRadius: 6
             }
         }
@@ -135,6 +138,11 @@ function updateCharts(stats) {
         minute: '2-digit',
         second: '2-digit'
     });
+
+    // Prevent duplicate timestamps
+    if (chartData.labels.length > 0 && chartData.labels[chartData.labels.length - 1] === now) {
+        return;
+    }
 
     // Add new data point
     chartData.labels.push(now);

@@ -137,8 +137,31 @@ func main() {
 	}
 	time.Sleep(time.Duration(jitterDelay) * time.Second)
 
-	collectAndSend()
-	fmt.Println("Agent completed. Exiting.")
+	// Main reporting loop
+	for {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Printf("Recovered from panic in main loop: %v\n", r)
+				}
+			}()
+			collectAndSend()
+		}()
+
+		// Jitter: random delay between 0 and JitterSeconds (default 30)
+		// added to a fixed 5-minute interval
+		jitter := config.JitterSeconds
+		if jitter <= 0 {
+			jitter = 30
+		}
+		extraDelay := rand.Intn(jitter)
+		
+		totalWait := 5*time.Minute + time.Duration(extraDelay)*time.Second
+		if config.LogLevel != "error" {
+			fmt.Printf("Success. Waiting %v before next report...\n", totalWait)
+		}
+		time.Sleep(totalWait)
+	}
 }
 
 func collectAndSend() {

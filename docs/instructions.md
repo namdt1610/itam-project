@@ -11,7 +11,7 @@ GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o server.exe ./server
 #linux
 go build -ldflags "-X main.ServerURL=http://192.168.80.135:8080/api/report -X main.AuthToken=YOUR_TOKEN -H=windowsgui" -o agent.exe ./agent
 
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.ServerURL=http://192.168.80.135:8080/api/report -X main.AuthToken=YOUR_TOKEN -H=windowsgui" -o agent.exe ./agent
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.BuildServerURL=http://172.16.202.155:8080/api/report -X main.BuildAuthToken=AnBinh@2026 -H=windowsgui" -o agent.exe ./agent
 ```
 *Kết quả:* Bạn có file `agent.exe` duy nhất, mang đi đâu cũng tự biết gửi dữ liệu về đúng chỗ.
 
