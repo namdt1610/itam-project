@@ -3,4 +3,5 @@
 itam.db
 *.db
 server/config.json
-agent/config.json
+agent/config.jsondocs
+docs

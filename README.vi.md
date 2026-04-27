@@ -9,24 +9,24 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT">
 </p>
 
-**[🇬🇧 English](README.md)**
+**[English](README.md)**
 
 ---
 
 ## Tính năng
 
-| Tính năng                       | Mô tả                                                    |
-| ------------------------------- | -------------------------------------------------------- |
-| 📊 **Dashboard thời gian thực** | Giám sát CPU, RAM, Disk với cập nhật trực tiếp qua HTMX  |
-| 🔍 **Tìm kiếm & Lọc**           | Tìm theo hostname, IP, địa chỉ MAC                       |
-| 📈 **Lịch sử sử dụng**          | Biểu đồ CPU/RAM theo thời gian (Chart.js)                |
-| 🚨 **Cảnh báo**                 | Tự động cảnh báo khi CPU/RAM > 90%                       |
-| 💾 **Backup tự động**           | Backup database khi server khởi động                     |
-| 🛡️ **Circuit Breaker**          | Giới hạn 100 req/s + tăng thời gian chờ theo cấp số nhân |
-| 📝 **Xoay Log**                 | Tự động xoay file log, 10MB/file, giữ 7 file             |
-| 📥 **Xuất CSV**                 | Xuất danh sách tài sản dạng CSV                          |
-| 🔑 **Token xác thực**           | Bearer token cho giao tiếp Agent-Server                  |
-| ⏹️ **Kill Switch**              | Điều khiển agent từ xa (ngủ/tắt)                         |
+| Tính năng                  | Mô tả                                                    |
+| -------------------------- | -------------------------------------------------------- |
+| **Dashboard thời gian thực** | Giám sát CPU, RAM, Disk với cập nhật trực tiếp qua HTMX  |
+| **Tìm kiếm & Lọc**         | Tìm theo hostname, IP, địa chỉ MAC                       |
+| **Lịch sử sử dụng**        | Biểu đồ CPU/RAM theo thời gian (Chart.js)                |
+| **Cảnh báo**               | Tự động cảnh báo khi CPU/RAM > 90%                       |
+| **Backup tự động**         | Backup database khi server khởi động                     |
+| **Circuit Breaker**        | Giới hạn 100 req/s + tăng thời gian chờ theo cấp số nhân |
+| **Xoay Log**               | Tự động xoay file log, 10MB/file, giữ 7 file             |
+| **Xuất CSV**               | Xuất danh sách tài sản dạng CSV                          |
+| **Token xác thực**         | Bearer token cho giao tiếp Agent-Server                  |
+| **Kill Switch**            | Điều khiển agent từ xa (ngủ/tắt)                         |
 
 ---
 
@@ -43,7 +43,7 @@
                                                 |
 +-------------+     HTMX polling         +------v------+
 |   Trình     | <----------------------- |   SQLite    |
-|   duyệt    |                          |   (WAL)     |
+|   duyệt     |                          |   (WAL)     |
 +-------------+                          +-------------+
 ```
 
@@ -77,15 +77,13 @@ make build
 cd agent && ./build/agent_bin
 ```
 
-### Agent cho Production (File EXE duy nhất)
+### Agent cho Production (Tiến trình ngầm)
 
 ```bash
 # Biên dịch agent với cài đặt nhúng sẵn (không cần config.json)
-make build-agent-prod \
-  SERVER_URL=http://192.168.1.100:8080/api/report \
-  AUTH_TOKEN=token-bi-mat
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s -w -X main.BuildServerURL=http://192.168.1.100:8080/api/report -X main.BuildAuthToken=token-bi-mat -H=windowsgui" -o ./build/agent.exe ./agent
 
-# Kết quả: ./build/agent.exe — triển khai qua GPO
+# Kết quả: ./build/agent.exe — triển khai qua GPO (Chạy ngầm ở chế độ ngủ sâu)
 ```
 
 ### Dashboard
@@ -126,7 +124,7 @@ Mở http://localhost:8080 sau khi khởi động server.
 }
 ```
 
-> **Thứ tự ưu tiên cài đặt (Agent):** Flags lúc biên dịch → Biến môi trường (`ITAM_AUTH_TOKEN`) → `config.json` cạnh file exe → `./config.json`
+> **Thứ tự ưu tiên cài đặt (Agent):** Flags lúc biên dịch -> Biến môi trường (`ITAM_AUTH_TOKEN`) -> `config.json` cạnh file exe -> `./config.json`
 
 ---
 
@@ -140,8 +138,8 @@ Mở http://localhost:8080 sau khi khởi động server.
 | 2000+    | 30+ phút   | 60s    | 60s            | PostgreSQL |
 
 ```
-Peak req/s = Số máy ÷ Jitter
-Ví dụ: 400 máy ÷ 30s jitter ≈ 13 req/s (thấp hơn nhiều so với giới hạn 100)
+Peak req/s = Số máy / Jitter
+Ví dụ: 400 máy / 30s jitter = 13 req/s (thấp hơn nhiều so với giới hạn 100)
 ```
 
 Xem [docs/SCALING.md](docs/SCALING.md) để biết chi tiết.
@@ -187,22 +185,20 @@ curl -X POST -H "Authorization: Bearer TOKEN" \
 ## Triển khai qua GPO (Windows)
 
 ```powershell
-# Tạo scheduled task chạy agent mỗi 15 phút
+# Tạo scheduled task chạy agent ngầm khi khởi động
 $action = New-ScheduledTaskAction -Execute "C:\ITAM\agent.exe"
-$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-  -RepetitionInterval (New-TimeSpan -Minutes 15)
-$settings = New-ScheduledTaskSettingsSet `
-  -RandomDelay (New-TimeSpan -Minutes 1)
-Register-ScheduledTask -TaskName "ITAM Agent" `
-  -Action $action -Trigger $trigger -Settings $settings
+$trigger = New-ScheduledTaskTrigger -AtStartup
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskName "ITAM Agent Daemon" `
+  -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest
 ```
 
 **Các bước:**
 
-1. Biên dịch agent: `make build-agent-prod SERVER_URL=... AUTH_TOKEN=...`
-2. Sao chép `agent.exe` vào thư mục chia sẻ trên mạng
-3. Tạo GPO để triển khai scheduled task
-4. Agent chạy → thu thập dữ liệu → gửi lên server → thoát
+1. Biên dịch agent: `go build -ldflags "-s -w -X main.BuildServerURL=... -X main.BuildAuthToken=..." ./agent`
+2. Sao chép `agent.exe` vào thư mục chia sẻ trên mạng (Domain)
+3. Tạo GPO để triển khai scheduled task lúc khởi động
+4. Agent chạy ngầm -> ngủ (Jitter) -> thu thập dữ liệu -> gửi lên server -> ngủ 5 phút (Vòng lặp vô hạn)
 
 ---
 
@@ -210,9 +206,9 @@ Register-ScheduledTask -TaskName "ITAM Agent" `
 
 | Tính năng           | Chi tiết                                                                           |
 | ------------------- | ---------------------------------------------------------------------------------- |
-| **Circuit Breaker** | Server: giới hạn 100 req/s (trả 429). Agent: backoff 5s→10s→20s                    |
+| **Circuit Breaker** | Server: giới hạn 100 req/s (trả 429). Agent: backoff 5s->10s->20s                  |
 | **Xoay Log**        | `logs/itam.log`, 10MB/file, giữ 7 file, log tóm tắt mỗi phút                       |
-| **Backup tự động**  | Khi khởi động → `backups/itam_YYYY-MM-DD_HH-MM-SS.db`. Giữ 7 ngày, tối thiểu 5 bản |
+| **Backup tự động**  | Khi khởi động -> `backups/itam_YYYY-MM-DD_HH-MM-SS.db`. Giữ 7 ngày, tối thiểu 5 bản |
 | **Dọn dữ liệu**     | Tự động xóa lịch sử > 30 ngày khi khởi động                                        |
 
 ---
@@ -226,16 +222,15 @@ itam-project/
 │   └── config.json       # Cấu hình Agent (gitignored)
 ├── server/
 │   ├── main.go           # Khởi động server + tắt an toàn
-│   ├── handlers.go       # Xử lý HTTP + xác thực + rate limiter
+│   ├── handlers.go       # Xử lý HTTP + xác thực (có go:embed)
 │   ├── store.go          # SQLite + backup + dọn dữ liệu
 │   ├── models.go         # Cấu trúc dữ liệu
 │   ├── config.go         # Cấu hình server
 │   ├── logger.go         # Hệ thống xoay log
 │   ├── templates.go      # Render giao diện HTMX
 │   ├── utils.go          # Hàm tiện ích
-│   └── templates/
-│       └── index.html    # Dashboard (Tabler.io)
-├── web/static/           # CSS, JS, thư viện vendor
+│   ├── web/              # File tĩnh nhúng (CSS, JS, Tabler.io)
+│   └── templates/        # Template HTMX nhúng (index.html)
 ├── cmd/loadtest/         # Kiểm tra tải (500 agent giả lập)
 ├── docs/SCALING.md       # Hướng dẫn mở rộng
 └── Makefile

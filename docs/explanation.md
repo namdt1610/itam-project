@@ -46,7 +46,7 @@
 **10. HTMX & HATEOAS:**
 *   **Giải thích:** Thay vì dùng React/Vue nặng nề tải cả đống Javascript về máy người dùng (SPA - Single Page App). HTMX cho phép Server "nấu" sẵn mã HTML rồi gửi về trình duyệt, trình duyệt chỉ việc dán đè (swap) vào màn hình. Rất nhẹ và siêu tốc độ.
 
-**11. WMI (Windows Management Instrumentation):**
+**11. WMI (Windows Management Inst rumentation):**
 *   **Giải thích:** Đây là hệ thống lõi của Windows dùng để quản lý phần cứng. Code Golang của bạn gọi vào WMI để lấy được các thông tin "tuyệt mật" như Tên CPU, RAM, Serial ổ cứng, v.v.
 
 ---

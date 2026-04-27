@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT">
 </p>
 
-**[🇻🇳 Tiếng Việt](README.vi.md)**
+**[Tiếng Việt](README.vi.md)**
 
 ---
 
@@ -17,16 +17,16 @@
 
 | Feature                    | Description                                         |
 | -------------------------- | --------------------------------------------------- |
-| 📊 **Real-time Dashboard** | Monitor CPU, RAM, Disk usage with live HTMX updates |
-| 🔍 **Search & Filter**     | Search by hostname, IP, MAC address                 |
-| 📈 **Usage History**       | CPU/RAM charts over time (Chart.js)                 |
-| 🚨 **Alerts**              | Auto-alerts when CPU/RAM > 90%                      |
-| 💾 **Auto Backup**         | Database backup on startup                          |
-| 🛡️ **Circuit Breaker**     | Rate limiting (100 req/s) + exponential backoff     |
-| 📝 **Log Rotation**        | Auto-rotate logs, 10MB/file, keep 7                 |
-| 📥 **Export CSV**          | Export full asset list                              |
-| 🔑 **Auth Token**          | Bearer token for agent-server communication         |
-| ⏹️ **Kill Switch**         | Remote sleep/exit agents                            |
+| **Real-time Dashboard**    | Monitor CPU, RAM, Disk usage with live HTMX updates |
+| **Search & Filter**        | Search by hostname, IP, MAC address                 |
+| **Usage History**          | CPU/RAM charts over time (Chart.js)                 |
+| **Alerts**                 | Auto-alerts when CPU/RAM > 90%                      |
+| **Auto Backup**            | Database backup on startup                          |
+| **Circuit Breaker**        | Rate limiting (100 req/s) + exponential backoff     |
+| **Log Rotation**           | Auto-rotate logs, 10MB/file, keep 7                 |
+| **Export CSV**             | Export full asset list                              |
+| **Auth Token**             | Bearer token for agent-server communication         |
+| **Kill Switch**            | Remote sleep/exit agents                            |
 
 ---
 
@@ -77,16 +77,15 @@ make build
 cd agent && ./build/agent_bin
 ```
 
-### Production Agent (Single EXE)
+### Production Agent (Persistent Daemon)
 
 ```bash
 # Build agent with embedded config (no config.json needed)
-make build-agent-prod \
-  SERVER_URL=http://192.168.1.100:8080/api/report \
-  AUTH_TOKEN=your-secret-token
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-s -w -X main.BuildServerURL=http://192.168.1.100:8080/api/report -X main.BuildAuthToken=your-secret-token -H=windowsgui" -o ./build/agent.exe ./agent
 
-# Output: ./build/agent.exe — deploy via GPO
+# Output: ./build/agent.exe — deploy via GPO (Runs as a deep sleep background daemon)
 ```
+
 
 ### Dashboard
 
@@ -113,7 +112,7 @@ Open http://localhost:8080 after starting the server.
 | `server_url`        | Server endpoint                               |
 | `auth_token`        | Secret token (must match server)              |
 | `top_process_limit` | Number of top processes to collect            |
-| `jitter_seconds`    | Random delay (0–N) to prevent thundering herd |
+| `jitter_seconds`    | Random delay (0-N) to prevent thundering herd |
 | `log_level`         | `"debug"`, `"info"`, or `"error"`             |
 
 ### Server (`server/config.json`)
@@ -126,7 +125,7 @@ Open http://localhost:8080 after starting the server.
 }
 ```
 
-> **Config priority (Agent):** Build-time flags → Environment variable (`ITAM_AUTH_TOKEN`) → `config.json` next to exe → `./config.json`
+> **Config priority (Agent):** Build-time flags -> Environment variable (`ITAM_AUTH_TOKEN`) -> `config.json` next to exe -> `./config.json`
 
 ---
 
@@ -134,14 +133,14 @@ Open http://localhost:8080 after starting the server.
 
 | Nodes    | GPO Interval | Agent Jitter | Dashboard Poll | Database   |
 | -------- | ------------ | ------------ | -------------- | ---------- |
-| 1–100    | 5 min        | 15s          | 15s            | SQLite     |
-| 100–500  | 5–15 min     | 30s          | 30s            | SQLite     |
-| 500–2000 | 15–30 min    | 60s          | 60s            | SQLite     |
+| 1-100    | 5 min        | 15s          | 15s            | SQLite     |
+| 100-500  | 5-15 min     | 30s          | 30s            | SQLite     |
+| 500-2000 | 15-30 min    | 60s          | 60s            | SQLite     |
 | 2000+    | 30+ min      | 60s          | 60s            | PostgreSQL |
 
 ```
-Peak req/s = Nodes ÷ Jitter
-Example: 400 nodes ÷ 30s jitter ≈ 13 req/s (well under 100 limit)
+Peak req/s = Nodes / Jitter
+Example: 400 nodes / 30s jitter = 13 req/s (well under 100 limit)
 ```
 
 See [docs/SCALING.md](docs/SCALING.md) for detailed tuning.
@@ -187,19 +186,18 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
 ## Deployment (Windows GPO)
 
 ```powershell
+# Create a Scheduled Task that runs the Agent as a Persistent Daemon at Startup
 $action = New-ScheduledTaskAction -Execute "C:\ITAM\agent.exe"
-$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-  -RepetitionInterval (New-TimeSpan -Minutes 15)
-$settings = New-ScheduledTaskSettingsSet `
-  -RandomDelay (New-TimeSpan -Minutes 1)
-Register-ScheduledTask -TaskName "ITAM Agent" `
-  -Action $action -Trigger $trigger -Settings $settings
+$trigger = New-ScheduledTaskTrigger -AtStartup
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskName "ITAM Agent Daemon" `
+  -Action $action -Trigger $trigger -Settings $settings -RunLevel Highest
 ```
 
-1. Build production agent: `make build-agent-prod SERVER_URL=... AUTH_TOKEN=...`
-2. Copy `agent.exe` to shared folder
-3. Create GPO to deploy the scheduled task
-4. Agent runs → collects data → sends to server → exits
+1. Build production agent: `go build -ldflags "-X main.BuildServerURL=... -X main.BuildAuthToken=..." ./agent`
+2. Copy `agent.exe` to a shared domain folder
+3. Create GPO to deploy the startup scheduled task
+4. Agent runs in background -> sleeps (Jitter) -> collects data -> sends -> sleeps for 5 mins (Infinite Loop)
 
 ---
 
@@ -207,9 +205,9 @@ Register-ScheduledTask -TaskName "ITAM Agent" `
 
 | Feature             | Detail                                                                 |
 | ------------------- | ---------------------------------------------------------------------- |
-| **Circuit Breaker** | Server: 100 req/s limit (429). Agent: exponential backoff 5s→10s→20s   |
+| **Circuit Breaker** | Server: 100 req/s limit (429). Agent: exponential backoff 5s->10s->20s |
 | **Log Rotation**    | `logs/itam.log`, 10MB/file, keep 7 rotated files, 1 log/min summary    |
-| **Auto Backup**     | On startup → `backups/itam_YYYY-MM-DD_HH-MM-SS.db`. Keep 7 days, min 5 |
+| **Auto Backup**     | On startup -> `backups/itam_YYYY-MM-DD_HH-MM-SS.db`. Keep 7 days, min 5 |
 | **Data Pruning**    | Auto-delete history > 30 days on startup                               |
 
 ---
@@ -223,16 +221,15 @@ itam-project/
 │   └── config.json       # Agent config (gitignored)
 ├── server/
 │   ├── main.go           # Server entry + graceful shutdown
-│   ├── handlers.go       # HTTP handlers + auth + rate limiter
+│   ├── handlers.go       # HTTP handlers + auth (with go:embed)
 │   ├── store.go          # SQLite + backup + pruning
 │   ├── models.go         # Data models
 │   ├── config.go         # Server configuration
 │   ├── logger.go         # Rotating log system
 │   ├── templates.go      # HTMX partial renderers
 │   ├── utils.go          # Helper functions
-│   └── templates/
-│       └── index.html    # Dashboard (Tabler.io)
-├── web/static/           # CSS, JS, vendor libs
+│   ├── web/              # Embedded static assets (CSS, JS, Tabler.io)
+│   └── templates/        # Embedded HTMX templates (index.html)
 ├── cmd/loadtest/         # Load test (500 agents)
 ├── docs/SCALING.md       # Scaling guide
 └── Makefile
